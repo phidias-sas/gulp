@@ -19,52 +19,70 @@ myApp/
 
 The library
 
-src/global/** /*.js
-src/components/** /*.js  
+src/global/**.js
+src/components/**.js
 ---->  my-package.js
 
-src/global/** /*.scss
-src/components/** /*.scss
+src/global/**.scss
+src/components/**.scss
 ---->  my-package.css
 
 
-The app (dependencies + library + states)
+The application
 
-DEPENDENCY/MAIN.js
-src/application/** /*.js  
+src/global/**.js
+src/components/**.js
+src/application/**.js
 ---->  my-package.app.js
 
-DEPENDENCY/MAIN.css
-DEPENDENCY/global/** /*.scss
-src/application/** /*.scss  
----->  my-package.app.js
+src/global/**.scss
+src/components/**.scss
+src/application/**.scss
+---->  my-package.app.css
+
+
+The bundle (dependencies + library + application)
+
+[dependendies]/main.js
+my-package.app.js
+---->  my-package.bundle.js
+
+[dependendies]/main.css
+my-package.app.css
+---->  my-package.bundle.css
 
 
 */
 
-var path          = require('path');
-var merge         = require('ordered-merge-stream');
-var download      = require('gulp-download');
-var concat        = require('gulp-concat');
-var rename        = require('gulp-rename');
-var sass          = require('gulp-sass');
-var minifyCSS     = require('gulp-minify-css');
-var uglify        = require('gulp-uglify');
-var underscore    = require('underscore');
-var underscoreStr = require('underscore.string');
-var bower         = require('./phidias-bower.js');
+var path               = require('path');
+var merge              = require('merge-stream');
+var orderedMergeStream = require('ordered-merge-stream');
+var download           = require('gulp-download');
+var concat             = require('gulp-concat');
+var rename             = require('gulp-rename');
+var sass               = require('gulp-sass');
+var minifyCSS          = require('gulp-minify-css');
+var uglify             = require('gulp-uglify');
+var bower              = require('./phidias-bower.js');
 
 module.exports = function(gulp) {
 
     var phidias = {
 
-        tasks: [],
-
-        task: function(taskName, task) {
-            gulp.task(taskName, task);
-            phidias.tasks.push(taskName);
-            return taskName;
+        watch: function(sources, triggerTaskName) {
+            if (typeof sources == "string") {
+                sources = [sources];
+            }
+            var watchable = [];
+            for (var cont = 0; cont < sources.length; cont++) {
+                var source = sources[cont];
+                if (source.substring(0, 4) != "http") {
+                    watchable.push(source);
+                }
+            }
+            gulp.watch(watchable, [triggerTaskName]);
         },
+
 
         getCombinedStream: function(sources) {
 
@@ -73,46 +91,23 @@ module.exports = function(gulp) {
             }
 
             var streams = [];
-
             for (var cont = 0; cont < sources.length; cont++) {
-
                 var source = sources[cont];
-
                 if (source.substring(0, 4) == "http") {
                     streams.push(download(source));
                 } else {
                     streams.push(gulp.src(source));
                 }
-
             }
 
-            return merge(streams);
+            return orderedMergeStream(streams);
 
         },
 
 
-        watch: function(sources, triggerTask) {
+        js: function(taskName, sources, target, taskDependencies) {
 
-            if (typeof sources == "string") {
-                sources = [sources];
-            }
-
-            var watchable = [];
-            for (var cont = 0; cont < sources.length; cont++) {
-                var source = sources[cont];
-                if (source.substring(0, 4) != "http") {
-                    watchable.push(source);
-                }
-            }
-
-            gulp.watch(watchable, [triggerTask]);
-
-        },
-
-
-        js: function(sources, target) {
-
-            var newTask = phidias.task('writing JS file '+target, function() {
+            var task = function() {
 
                 var targetFolder = path.dirname(target);
                 var fileName     = path.basename(target);
@@ -124,16 +119,22 @@ module.exports = function(gulp) {
                     .pipe(rename(minFileName))
                     .pipe(uglify()).on('error', logError)
                     .pipe(gulp.dest(targetFolder));
+            };
 
-            });
+            if (taskDependencies) {
+                gulp.task(taskName, taskDependencies, task);
+            } else {
+                gulp.task(taskName, task);
+            }
 
-            phidias.watch(sources, newTask);
+            phidias.watch(sources, taskName);
 
         },
 
-        css: function(sources, target) {
 
-            var newTask = phidias.task('writing CSS file '+target, function() {
+        css: function(taskName, sources, target, taskDependencies) {
+
+            var task = function() {
 
                 var targetFolder = path.dirname(target);
                 var fileName     = path.basename(target);
@@ -145,23 +146,58 @@ module.exports = function(gulp) {
                     .pipe(gulp.dest(targetFolder))
                     .pipe(rename(minFileName))
                     .pipe(minifyCSS()).on('error', logError)
-                    .pipe(gulp.dest(targetFolder));            
+                    .pipe(gulp.dest(targetFolder));
 
-            });
+            };
 
-            phidias.watch(sources, newTask);
+            if (taskDependencies) {
+                gulp.task(taskName, taskDependencies, task);
+            } else {
+                gulp.task(taskName, task);
+            }
+
+            phidias.watch(sources, taskName);
 
         },
 
-        copy: function(sources, target) {
+        copy: function(taskName, sources, target, taskDependencies) {
 
-            var newTask = phidias.task("copying into "+target, function() {
+            var task = function() {
                 return gulp.src(sources).pipe(gulp.dest(target));
-            });
+            };
 
-            phidias.watch(sources, newTask);
+            if (taskDependencies) {
+                gulp.task(taskName, taskDependencies, task);
+            } else {
+                gulp.task(taskName, task);
+            }
+
+            phidias.watch(sources, taskName);
 
         },
+
+        concat: function(taskName, sources, target, taskDependencies) {
+
+            var task = function() {
+
+                var fileName     = path.basename(target);
+                var targetFolder = path.dirname(target);
+
+                return gulp.src(sources)
+                    .pipe(concat(fileName))
+                    .pipe(gulp.dest(targetFolder));
+            };
+
+            if (taskDependencies) {
+                gulp.task(taskName, taskDependencies, task);
+            } else {
+                gulp.task(taskName, task);
+            }
+
+            phidias.watch(sources, taskName);
+
+        },
+
 
         build: function(options) {
 
@@ -170,76 +206,82 @@ module.exports = function(gulp) {
             options.dest     = options.dest     == undefined ? options.src + '/public'              : options.dest;
             options.bowerDir = options.bowerDir == undefined ? options.src + '/bower_components'    : options.bowerDir;
 
-            /* Components only */
-            phidias.js([
-                options.src + '/src/global/**/*.js',
-                options.src + '/src/components/**/*.js'
-            ], options.dest + '/build/'+options.name+'.js');
+            /* Build stand-alone components */
 
-            phidias.css([
-                options.src + '/src/global/**/*.scss',
-                options.src + '/src/components/**/*.scss'
-            ], options.dest + '/build/'+options.name+'.css');
+            phidias.js('library.scripts',
+                [
+                    options.src + '/src/global/**/*.js',
+                    options.src + '/src/components/**/*.js'
+                ],
+                options.dest + '/build/'+options.name+'.js'
+            );
+
+            phidias.css('library.styles',
+                [
+                    options.src + '/src/global/**/*.scss',
+                    options.src + '/src/components/**/*.scss'
+                ],
+                options.dest + '/build/'+options.name+'.css'
+            );
+
+            gulp.task('library', ['library.scripts', 'library.styles']);
 
 
-            /* Bundled app */
-            var dependencies = bower.getDependencies(options.src, options.bowerDir);        
+            /* Build application */
 
-            var mainFiles = {
-                js:  [],
-                css: []
-            };
+            phidias.js('application.scripts',
+                [
+                    options.src + '/src/global/**/*.js',
+                    options.src + '/src/components/**/*.js',
+                    options.src + '/src/application/**/*.js'
+                ],
+                options.dest + '/build/' + options.name + '.app.js'
+            );
 
-            underscore.mapObject(dependencies, function(packageData, packageName) {
+            phidias.css('application.styles',
+                [
+                    options.src + '/src/global/**/*.scss',
+                    options.src + '/src/components/**/*.scss',
+                    options.src + '/src/application/**/*.scss'
+                ],
+                options.dest + '/build/'+options.name+'.app.css'
+            );
 
-                mainFiles.css.push(packageData.path + '/src/global/**/*.scss');
+            phidias.copy('application.partials',
+                options.src + '/src/application/states/**/*.html',
+                options.dest + '/partials'
+            );
 
-                if (packageData.bower.main === undefined) {
-                    return;
-                }
+            gulp.task('application', ['application.scripts', 'application.styles', 'application.partials']);
 
-                var packageMainFiles = underscore.isArray(packageData.bower.main) ? packageData.bower.main : [packageData.bower.main];
 
-                underscore.each(packageMainFiles, function(mainFile) {
+            /* Bundle all dependencies */
 
-                    if (underscoreStr.endsWith(mainFile, '.js')){
-                        mainFiles.js.push(packageData.path + '/' + mainFile);
-                    }
+            var mainFiles = bower.getMainFiles(options.src, options.bowerDir);
 
-                    if (underscoreStr.endsWith(mainFile, '.css')){
-                        mainFiles.css.push(packageData.path + '/' + mainFile);
-                    }
+            phidias.concat('bundle.scripts',
+                mainFiles.js.concat([options.dest + '/build/' + options.name + '.app.min.js']),
+                options.dest + '/build/' + options.name + '.bundle.js',
+                ['application.scripts']
+            );
 
-                });
-            });
+            phidias.concat('bundle.styles',
+                mainFiles.css.concat([options.dest + '/build/' + options.name + '.app.min.css']),
+                options.dest + '/build/' + options.name + '.bundle.css',
+                ['application.styles']
+            );
 
-            phidias.js(mainFiles.js.concat([
-                options.dest + '/build/' + options.name + '.js',
-                options.src + '/src/application/**/*.js'
-            ]), options.dest + '/build/' + options.name + '.app.js');
+            gulp.task('bundle', ['bundle.scripts', 'bundle.styles']);
 
-            phidias.css(mainFiles.css.concat([
-                options.dest + '/' + options.name + '.css',
-                options.src + '/src/application/**/*.scss'
-            ]), options.dest + '/build/' + options.name + '.app.css');
-          
-            // Move partials into public folder
-            phidias.copy(options.src + '/src/application/states/**/*.html', options.dest + '/partials');
-
+            /* Default task: build library */
+            gulp.task('default', ['library']);
         }
 
     };
 
-    gulp.task('default', phidias.tasks);    
-
-    return {
-        js:    phidias.js,
-        css:   phidias.css,
-        build: phidias.build
-    };
+    return phidias;
 
 };
-
 
 //error handler to log errors without interrupting 'watch'
 function logError(error) {

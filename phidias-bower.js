@@ -1,3 +1,4 @@
+var fs            = require('fs');
 var underscore    = require('underscore');
 var underscoreStr = require('underscore.string');
 
@@ -24,6 +25,50 @@ var bower = {
         });
 
         return bower.packages;
+    },
+
+    getMainFiles: function(dir, bowerDir) {
+
+        var dependencies = bower.getDependencies(dir, bowerDir);
+
+        var mainFiles = {
+            js:   [],
+            css:  []
+        };
+
+        underscore.mapObject(dependencies, function(packageData, packageName) {
+
+            if (packageData.bower === undefined || packageData.bower.main === undefined) {
+                return;
+            }
+
+            var packageMainFiles = underscore.isArray(packageData.bower.main) ? packageData.bower.main : [packageData.bower.main];
+
+            underscore.each(packageMainFiles, function(mainFile) {
+
+                if (underscoreStr.endsWith(mainFile, '.js')){
+                    var minFile = mainFile.replace('.js', '.min.js');
+                    if (fs.existsSync(packageData.path + '/' + minFile)) {
+                        mainFiles.js.push(packageData.path + '/' + minFile);
+                    } else {
+                        mainFiles.js.push(packageData.path + '/' + mainFile);
+                    }
+                }
+
+                if (underscoreStr.endsWith(mainFile, '.css')) {
+                    var minFile = mainFile.replace('.css', '.min.css');
+                    if (fs.existsSync(packageData.path + '/' + minFile)) {
+                        mainFiles.css.push(packageData.path + '/' + minFile);
+                    } else {
+                        mainFiles.css.push(packageData.path + '/' + mainFile);
+                    }
+                }
+
+            });
+
+        });
+
+        return mainFiles;
     },
 
     addPackage: function(name, bowerDir) {
