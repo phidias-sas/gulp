@@ -64,6 +64,7 @@ var sass               = require('gulp-sass');
 var minifyCSS          = require('gulp-minify-css');
 var uglify             = require('gulp-uglify');
 var bower              = require('./phidias-bower.js');
+var templateCache      = require('gulp-angular-templatecache');
 
 module.exports = function(gulp) {
 
@@ -103,6 +104,28 @@ module.exports = function(gulp) {
             return orderedMergeStream(streams);
 
         },
+
+        templates: function(taskName, sources, target, moduleName) {
+
+            var task = function() {
+
+                var fileName     = path.basename(target);
+                var targetFolder = path.dirname(target);
+
+                return phidias.getCombinedStream(sources)
+                    .pipe(templateCache(fileName, {
+                        root: "/",
+                        module: moduleName
+                    }))
+                    .pipe(rename(fileName))
+                    .pipe(gulp.dest(targetFolder));
+            };
+
+            gulp.task(taskName, task);
+            phidias.watch(sources, taskName);
+
+        },
+
 
 
         js: function(taskName, sources, target, taskDependencies) {
@@ -206,14 +229,18 @@ module.exports = function(gulp) {
             options.dest     = options.dest     == undefined ? options.src + '/public'              : options.dest;
             options.bowerDir = options.bowerDir == undefined ? options.src + '/bower_components'    : options.bowerDir;
 
-            /* Build stand-alone components */
+            /* Build stand-alone (library) components */
+
+            phidias.templates('templates', [options.src+'/src/**/*.html'], options.dest+'/build/templates.js', options.name);
 
             phidias.js('library.scripts',
                 [
                     options.src + '/src/global/**/*.js',
-                    options.src + '/src/components/**/*.js'
+                    options.src + '/src/components/**/*.js',
+                    options.dest + '/build/templates.js'
                 ],
-                options.dest + '/build/'+options.name+'.js'
+                options.dest + '/build/'+options.name+'.js',
+                ['templates']
             );
 
             phidias.css('library.styles',
@@ -233,9 +260,11 @@ module.exports = function(gulp) {
                 [
                     options.src + '/src/global/**/*.js',
                     options.src + '/src/components/**/*.js',
-                    options.src + '/src/application/**/*.js'
+                    options.src + '/src/application/**/*.js',
+                    options.dest + '/build/templates.js'
                 ],
-                options.dest + '/build/' + options.name + '.app.js'
+                options.dest + '/build/' + options.name + '.app.js',
+                ['templates']
             );
 
             phidias.css('application.styles',
