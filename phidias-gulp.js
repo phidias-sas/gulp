@@ -55,7 +55,6 @@ my-package.app.css
 */
 
 var path               = require('path');
-var merge              = require('merge-stream');
 var orderedMergeStream = require('ordered-merge-stream');
 var download           = require('gulp-download');
 var concat             = require('gulp-concat');
