@@ -46,22 +46,24 @@ var bower = {
 
             underscore.each(packageMainFiles, function(mainFile) {
 
-                if (underscoreStr.endsWith(mainFile, '.js')){
-                    var minFile = mainFile.replace('.js', '.min.js');
-                    if (fs.existsSync(packageData.path + '/' + minFile)) {
-                        mainFiles.js.push(packageData.path + '/' + minFile);
-                    } else {
-                        mainFiles.js.push(packageData.path + '/' + mainFile);
-                    }
+                if (underscoreStr.endsWith(mainFile, '.js')) {
+                    mainFiles.js.push(packageData.path + '/' + mainFile);
+                    // var minFile = mainFile.replace('.js', '.min.js');
+                    // if (fs.existsSync(packageData.path + '/' + minFile)) {
+                    //     mainFiles.js.push(packageData.path + '/' + minFile);
+                    // } else {
+                    //     mainFiles.js.push(packageData.path + '/' + mainFile);
+                    // }
                 }
 
                 if (underscoreStr.endsWith(mainFile, '.css')) {
-                    var minFile = mainFile.replace('.css', '.min.css');
-                    if (fs.existsSync(packageData.path + '/' + minFile)) {
-                        mainFiles.css.push(packageData.path + '/' + minFile);
-                    } else {
-                        mainFiles.css.push(packageData.path + '/' + mainFile);
-                    }
+                    mainFiles.css.push(packageData.path + '/' + mainFile);
+                    // var minFile = mainFile.replace('.css', '.min.css');
+                    // if (fs.existsSync(packageData.path + '/' + minFile)) {
+                    //     mainFiles.css.push(packageData.path + '/' + minFile);
+                    // } else {
+                    //     mainFiles.css.push(packageData.path + '/' + mainFile);
+                    // }
                 }
 
             });

@@ -17,7 +17,7 @@ myApp/
             ...
 
 
-The library
+The package
 
 src/global/**.js
 src/components/**.js
@@ -41,7 +41,7 @@ src/application/**.scss
 ---->  my-package.app.css
 
 
-The bundle (dependencies + library + application)
+The bundle (dependencies + application)
 
 [dependendies]/main.js
 my-package.app.js
@@ -154,6 +154,31 @@ module.exports = function(gulp) {
 
         },
 
+        sass: function(taskName, sources, target, taskDependencies) {
+
+            var task = function() {
+
+                var targetFolder = path.dirname(target);
+                var fileName     = path.basename(target);
+
+                return phidias.getCombinedStream(sources)
+                    .pipe(concat(fileName))
+                    .pipe(sass()).on('error', logError)
+                    .pipe(gulp.dest(targetFolder));
+
+            };
+
+            if (taskDependencies) {
+                gulp.task(taskName, taskDependencies, task);
+            } else {
+                gulp.task(taskName, task);
+            }
+
+            phidias.watch(sources, taskName);
+
+        },
+
+
 
         css: function(taskName, sources, target, taskDependencies) {
 
@@ -165,7 +190,6 @@ module.exports = function(gulp) {
 
                 return phidias.getCombinedStream(sources)
                     .pipe(concat(fileName))
-                    .pipe(sass()).on('error', logError)
                     .pipe(gulp.dest(targetFolder))
                     .pipe(rename(minFileName))
                     .pipe(minifyCSS()).on('error', logError)
@@ -229,81 +253,142 @@ module.exports = function(gulp) {
             options.dest     = options.dest     == undefined ? options.src + '/public'              : options.dest;
             options.bowerDir = options.bowerDir == undefined ? options.src + '/bower_components'    : options.bowerDir;
 
-            /* Build stand-alone (library) components */
 
-            phidias.templates('templates', [options.src+'/src/**/*.html'], options.dest+'/build/templates.js', options.name);
+            options.outputs = {
+                templates: options.dest + '/build/templates.js',
+                package: {
+                    js: options.dest + '/build/' + options.name + '.js',
+                    css: options.dest + '/build/' + options.name + '.css'
+                },
+                application: {
+                    js: options.dest + '/build/' + options.name + '.app.js',
+                    css: options.dest + '/build/'+options.name+'.app.css'
+                },
+                dependencies: {
+                    js: options.dest + '/build/' + options.name + '.dependencies.js',
+                    css: options.dest + '/build/' + options.name + '.dependencies.css'
+                },
+                bundle: {
+                    js: options.dest + '/build/' + options.name + '.bundle.js',
+                    css: options.dest + '/build/' + options.name + '.bundle.css'
+                }
+            };
 
-            phidias.js('library.scripts',
-                [
-                    options.src + '/src/global/**/*.js',
-                    options.src + '/src/components/**/*.js',
-                    options.dest + '/build/templates.js'
-                ],
-                options.dest + '/build/'+options.name+'.js',
-                ['templates']
+
+            options.sources = {
+                templates: [options.src + '/src/**/*.html'],
+                package: {
+                    js: [
+                        options.src + '/src/global/**/*.js',
+                        options.src + '/src/components/**/*.js',
+                        options.outputs.templates
+                    ],
+                    css: [
+                        options.src + '/src/global/**/*.scss',
+                        options.src + '/src/components/**/*.scss'
+                    ]
+                },
+                application: {
+                    js: [
+                        options.src + '/src/global/**/*.js',
+                        options.src + '/src/components/**/*.js',
+                        options.src + '/src/application/**/*.js',
+                        options.outputs.templates
+                    ],
+                    css: [
+                        options.src + '/src/global/**/*.scss',
+                        options.src + '/src/components/**/*.scss',
+                        options.src + '/src/application/**/*.scss'
+                    ]
+                }
+            };
+
+
+
+            /* Build stand-alone (package) components */
+
+            phidias.templates('package.templates',
+                options.sources.templates,
+                options.outputs.templates,
+                options.name
             );
 
-            phidias.css('library.styles',
-                [
-                    options.src + '/src/global/**/*.scss',
-                    options.src + '/src/components/**/*.scss'
-                ],
-                options.dest + '/build/'+options.name+'.css'
+            phidias.js('package.scripts',
+                options.sources.package.js,
+                options.outputs.package.js,
+                ['package.templates']
             );
 
-            gulp.task('library', ['library.scripts', 'library.styles']);
+            //phidias.css('package.styles',
+            phidias.sass('package.styles',
+                options.sources.package.css,
+                options.outputs.package.css
+            );
+
+            gulp.task('package', ['package.scripts', 'package.styles']);
 
 
             /* Build application */
 
             phidias.js('application.scripts',
-                [
-                    options.src + '/src/global/**/*.js',
-                    options.src + '/src/components/**/*.js',
-                    options.src + '/src/application/**/*.js',
-                    options.dest + '/build/templates.js'
-                ],
-                options.dest + '/build/' + options.name + '.app.js',
-                ['templates']
+                options.sources.application.js,
+                options.outputs.application.js,
+                ['package.templates']
             );
 
-            phidias.css('application.styles',
-                [
-                    options.src + '/src/global/**/*.scss',
-                    options.src + '/src/components/**/*.scss',
-                    options.src + '/src/application/**/*.scss'
-                ],
-                options.dest + '/build/'+options.name+'.app.css'
+            //phidias.css('application.styles',
+            phidias.sass('application.styles',
+                options.sources.application.css,
+                options.outputs.application.css
             );
 
-            phidias.copy('application.partials',
-                options.src + '/src/application/states/**/*.html',
-                options.dest + '/partials'
+            gulp.task('application', ['application.scripts', 'application.styles']);
+
+
+
+            /* Concatenate all dependencies */
+            var allDependencies = bower.getMainFiles(options.src, options.bowerDir);
+
+            phidias.concat('dependencies.scripts',
+                allDependencies.js,
+                options.outputs.dependencies.js
             );
 
-            gulp.task('application', ['application.scripts', 'application.styles', 'application.partials']);
+            phidias.concat('dependencies.styles',
+                allDependencies.css,
+                options.outputs.dependencies.css
+            );
+
+            gulp.task('dependencies', ['dependencies.scripts', 'dependencies.styles']);
 
 
-            /* Bundle all dependencies */
 
-            var mainFiles = bower.getMainFiles(options.src, options.bowerDir);
+            /* Bundle app with dependencies */
 
+            //phidias.js('bundle.scripts',   // use this line to uglify all output
             phidias.concat('bundle.scripts',
-                mainFiles.js.concat([options.dest + '/build/' + options.name + '.app.min.js']),
-                options.dest + '/build/' + options.name + '.bundle.js',
-                ['application.scripts']
+                [
+                    options.outputs.dependencies.js,
+                    options.outputs.application.js
+                ],
+                options.outputs.bundle.js,
+                ['dependencies.scripts', 'application.scripts']
             );
 
+            //phidias.css('bundle.styles',  // use this line to minify all output css
             phidias.concat('bundle.styles',
-                mainFiles.css.concat([options.dest + '/build/' + options.name + '.app.min.css']),
-                options.dest + '/build/' + options.name + '.bundle.css',
-                ['application.styles']
+                [
+                    options.outputs.dependencies.css,
+                    options.outputs.application.css
+                ],
+                options.outputs.bundle.css,
+                ['dependencies.styles', 'application.styles']
             );
 
             gulp.task('bundle', ['bundle.scripts', 'bundle.styles']);
 
-            /* Default task: build library */
-            gulp.task('default', ['library']);
+            /* Default task: build package */
+            gulp.task('default', ['package']);
         }
 
     };
