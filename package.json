@@ -1,6 +1,6 @@
 {
   "name": "phidias-gulp",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Recurrent gulp tasks to build Phidias modules",
   "main": "phidias-gulp.js",
   "dependencies": {
@@ -18,11 +18,9 @@
     "gulp-angular-templatecache": "*"
   },
   "devDependencies": {},
-
-  "repository" : {
+  "repository": {
     "type": "git",
     "url": "https://github.com/phidias-sas/phidias-gulp.git"
   },
-
   "license": "GPL-3.0"
 }
